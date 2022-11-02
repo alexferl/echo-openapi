@@ -12,14 +12,20 @@ import (
 	"github.com/getkin/kin-openapi/routers"
 	"github.com/getkin/kin-openapi/routers/gorillamux"
 	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v4/middleware"
 )
 
 type Config struct {
-	Schema     string
-	ContextKey string
+	// Skipper defines a function to skip middleware.
+	Skipper middleware.Skipper
+
+	Schema       string
+	ContextKey   string
+	ExemptRoutes map[string][]string
 }
 
 var DefaultConfig = Config{
+	Skipper:    middleware.DefaultSkipper,
 	ContextKey: "validator",
 }
 
@@ -30,8 +36,24 @@ func OpenAPI(file string) echo.MiddlewareFunc {
 }
 
 func OpenAPIWithConfig(config Config) echo.MiddlewareFunc {
+	if config.Skipper == nil {
+		config.Skipper = DefaultConfig.Skipper
+	}
+
+	if config.ContextKey == "" {
+		config.ContextKey = DefaultConfig.ContextKey
+	}
+
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
+			if config.Skipper(c) {
+				return next(c)
+			}
+
+			if check(c.Path(), c.Request().Method, config.ExemptRoutes) {
+				return next(c)
+			}
+
 			ctx := context.Background()
 			loader := &openapi3.Loader{Context: ctx, IsExternalRefsAllowed: true}
 			schema, err := loader.LoadFromFile(config.Schema)
@@ -152,6 +174,19 @@ func convertError(me openapi3.MultiError) map[string][]string {
 		}
 	}
 	return issues
+}
+
+func check(path string, method string, m map[string][]string) bool {
+	for k, v := range m {
+		if k == path {
+			for _, i := range v {
+				if method == i {
+					return true
+				}
+			}
+		}
+	}
+	return false
 }
 
 type ValidationError struct {
