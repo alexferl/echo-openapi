@@ -3,7 +3,6 @@ package openapi
 import (
 	"context"
 	"encoding/json"
-	"encoding/xml"
 	"fmt"
 	"net/http"
 	"strings"
@@ -13,8 +12,7 @@ import (
 )
 
 const (
-	ApplicationJSON = "application/json"
-	ApplicationXML  = "application/xml"
+	ApplicationJSON = echo.MIMEApplicationJSON
 )
 
 type Handler struct {
@@ -22,19 +20,28 @@ type Handler struct {
 }
 
 type HandlerConfig struct {
-	ContentType  string
+	// ContentType sets the Content-Type header of the response.
+	// Optional. Defaults to "application/json".
+	ContentType string
+
+	// ValidatorKey defines the key that will be used to read the
+	// *openapi3filter.RequestValidationInput from the echo.Context
+	// set by the middleware.
+	// Optional. Defaults to "validator".
 	ValidatorKey string
-	// Set ExcludeRequestBody so ValidateRequest skips request body validation.
+
+	// ExcludeRequestBody makes Validate skips request body validation.
+	// Optional. Defaults to false.
 	ExcludeRequestBody bool
 
-	// Set ExcludeResponseBody so ValidateResponse skips response body validation.
+	// ExcludeResponseBody makes Validate skips response body validation.
+	// Optional. Defaults to false.
 	ExcludeResponseBody bool
 
-	// Set IncludeResponseStatus so ValidateResponse fails on response
-	// status not defined in OpenAPI spec.
+	// IncludeResponseStatus so ValidateResponse fails on response
+	// statuses not defined in the OpenAPI spec.
+	// Optional. Defaults to true.
 	IncludeResponseStatus bool
-
-	MultiError bool
 }
 
 var DefaultHandlerConfig = HandlerConfig{
@@ -43,7 +50,6 @@ var DefaultHandlerConfig = HandlerConfig{
 	ExcludeRequestBody:    false,
 	ExcludeResponseBody:   false,
 	IncludeResponseStatus: true,
-	MultiError:            true,
 }
 
 func NewHandler() *Handler {
@@ -52,6 +58,14 @@ func NewHandler() *Handler {
 }
 
 func NewHandlerWithConfig(config HandlerConfig) *Handler {
+	if config.ContentType == "" {
+		config.ContentType = DefaultHandlerConfig.ContentType
+	}
+
+	if config.ValidatorKey == "" {
+		config.ValidatorKey = DefaultHandlerConfig.ValidatorKey
+	}
+
 	return &Handler{Config: config}
 }
 
@@ -64,9 +78,12 @@ func (h *Handler) ValidateWithContentType(c echo.Context, code int, contentType 
 }
 
 func (h *Handler) validate(c echo.Context, code int, contentType string, v any) error {
+	// there's nothing to validate so just return
 	if code == http.StatusNoContent {
 		return c.NoContent(code)
 	}
+
+	c.Response().Status = code
 
 	input, ok := c.Get(h.Config.ValidatorKey).(*openapi3filter.RequestValidationInput)
 	if !ok {
@@ -79,22 +96,23 @@ func (h *Handler) validate(c echo.Context, code int, contentType string, v any) 
 	)
 
 	if strings.HasPrefix(contentType, ApplicationJSON) {
+		c.Response().Header().Add("Content-Type", contentType)
 		b, err = json.Marshal(v)
-	} else if strings.HasPrefix(contentType, ApplicationXML) {
-		b, err = xml.Marshal(v)
 	} else {
-		switch v.(type) {
+		c.Response().Header().Add("Content-Type", echo.MIMETextPlain)
+		switch t := v.(type) {
 		case string:
 			b = []byte(v.(string))
+		case []byte:
+			b = v.([]byte)
+		default:
+			return fmt.Errorf("type %s not supported", t)
 		}
 	}
 
 	if err != nil {
 		return fmt.Errorf("failed marshaling response: %v", err)
 	}
-
-	c.Response().Status = code
-	c.Response().Header().Add("Content-Type", contentType)
 
 	responseValidationInput := &openapi3filter.ResponseValidationInput{
 		RequestValidationInput: input,
@@ -104,7 +122,7 @@ func (h *Handler) validate(c echo.Context, code int, contentType string, v any) 
 			ExcludeRequestBody:    h.Config.ExcludeRequestBody,
 			ExcludeResponseBody:   h.Config.ExcludeResponseBody,
 			IncludeResponseStatus: h.Config.IncludeResponseStatus,
-			MultiError:            h.Config.MultiError,
+			MultiError:            true,
 		},
 	}
 	responseValidationInput.SetBodyBytes(b)
@@ -112,7 +130,7 @@ func (h *Handler) validate(c echo.Context, code int, contentType string, v any) 
 	ctx := context.Background()
 	err = openapi3filter.ValidateResponse(ctx, responseValidationInput)
 	if err != nil {
-		c.Logger().Debug(err)
+		c.Logger().Error(err)
 		return fmt.Errorf("failed validating response: %v", err)
 	}
 
