@@ -154,7 +154,7 @@ type HandlerConfig struct {
 	// Optional. Defaults to false.
 	ExcludeResponseBody bool
 
-	// IncludeResponseStatus so ValidateResponse fails on response
+	// IncludeResponseStatus makes Validate fail on response
 	// statuses not defined in the OpenAPI spec.
 	// Optional. Defaults to true.
 	IncludeResponseStatus bool
