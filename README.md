@@ -136,27 +136,27 @@ type Config struct {
 }
 
 type HandlerConfig struct {
-    // ContentType sets the Content-Type header of the response.
-    // Optional. Defaults to "application/json".
-    ContentType string
+	// ContentType sets the Content-Type header of the response.
+	// Optional. Defaults to "application/json".
+	ContentType string
 
-    // ValidatorKey defines the key that will be used to read the
-    // *openapi3filter.RequestValidationInput from the echo.Context
-    // set by the middleware.
-    // Optional. Defaults to "validator".
-    ValidatorKey string
+	// ValidatorKey defines the key that will be used to read the
+	// *openapi3filter.RequestValidationInput from the echo.Context
+	// set by the middleware.
+	// Optional. Defaults to "validator".
+	ValidatorKey string
 
-    // ExcludeRequestBody makes Validate skips request body validation.
-    // Optional. Defaults to false.
-    ExcludeRequestBody bool
+	// ExcludeRequestBody makes Validate skips request body validation.
+	// Optional. Defaults to false.
+	ExcludeRequestBody bool
 
-    // ExcludeResponseBody makes Validate skips response body validation.
-    // Optional. Defaults to false.
-    ExcludeResponseBody bool
+	// ExcludeResponseBody makes Validate skips response body validation.
+	// Optional. Defaults to false.
+	ExcludeResponseBody bool
 
-    // IncludeResponseStatus so ValidateResponse fails on response
-    // statuses not defined in the OpenAPI spec.
-    // Optional. Defaults to true.
-    IncludeResponseStatus bool
+	// IncludeResponseStatus so ValidateResponse fails on response
+	// statuses not defined in the OpenAPI spec.
+	// Optional. Defaults to true.
+	IncludeResponseStatus bool
 }
 ```
