@@ -1,0 +1,107 @@
+openapi: 3.0.4
+info:
+  version: 1.0.0
+  title: Test API
+  description: A test API
+paths:
+  /:
+    get:
+      description: Root
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - message
+                properties:
+                  message:
+                    type: string
+                    description: Welcome message
+  /no-content:
+    post:
+      description: No content
+      responses:
+        '204':
+          description: Successful response
+  /text:
+    get:
+      description: Text route
+      responses:
+        '200':
+          description: Successful response
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: ok
+  /exempt:
+    post:
+      description: Exempt route
+      responses:
+        '200':
+          description: Successful response
+  /validation:
+    post:
+      description: Validation route
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+                - username
+              properties:
+                username:
+                  type: string
+                  pattern: "^[0-9a-zA-Z._]+$"
+                  description: The username of the user
+                  minLength: 2
+                  maxLength: 30
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  username:
+                    type: string
+                    pattern: "^[0-9a-zA-Z._]+$"
+                    description: The username of the user
+                    minLength: 2
+                    maxLength: 30
+  /validation/{username}:
+    post:
+      description: Validation route
+      parameters:
+        - name: username
+          in: path
+          required: true
+          schema:
+            type: string
+            minLength: 2
+            maxLength: 30
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 10
+        - name: x-username
+          in: header
+          schema:
+            type: string
+            minLength: 2
+            maxLength: 30
+      responses:
+        '200':
+          description: Successful response

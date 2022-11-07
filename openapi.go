@@ -19,8 +19,18 @@ type Config struct {
 	// Skipper defines a function to skip middleware.
 	Skipper middleware.Skipper
 
-	Schema       string
-	ContextKey   string
+	// Schema defines the OpenAPI that will be loaded and
+	// that the requests and responses will be validated against.
+	// Required.
+	Schema string
+
+	// ContextKey defines the key that will be used to store the validator
+	// on the echo.Context when the request is successfully validated.
+	// Optional. Defaults to "validator".
+	ContextKey string
+
+	// ExemptRoutes defines routes and methods that don't require validation.
+	// Optional.
 	ExemptRoutes map[string][]string
 }
 
@@ -40,8 +50,29 @@ func OpenAPIWithConfig(config Config) echo.MiddlewareFunc {
 		config.Skipper = DefaultConfig.Skipper
 	}
 
+	if config.Schema == "" {
+		panic("schema is required")
+	}
+
 	if config.ContextKey == "" {
 		config.ContextKey = DefaultConfig.ContextKey
+	}
+
+	ctx := context.Background()
+	loader := &openapi3.Loader{Context: ctx, IsExternalRefsAllowed: true}
+	schema, err := loader.LoadFromFile(config.Schema)
+	if err != nil {
+		panic(fmt.Sprintf("failed loading schema file: %v", err))
+	}
+
+	err = schema.Validate(ctx)
+	if err != nil {
+		panic(fmt.Sprintf("failed validating schema: %v", err))
+	}
+
+	router, err := gorillamux.NewRouter(schema)
+	if err != nil {
+		panic(fmt.Sprintf("failed creating router: %v", err))
 	}
 
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
@@ -54,29 +85,12 @@ func OpenAPIWithConfig(config Config) echo.MiddlewareFunc {
 				return next(c)
 			}
 
-			ctx := context.Background()
-			loader := &openapi3.Loader{Context: ctx, IsExternalRefsAllowed: true}
-			schema, err := loader.LoadFromFile(config.Schema)
+			route, pathParams, err := router.FindRoute(c.Request())
 			if err != nil {
-				c.Logger().Errorf("error loading schema file: %v", err)
-				return err
-			}
-
-			err = schema.Validate(ctx)
-			if err != nil {
-				c.Logger().Errorf("error validating schema: %v", err)
-				return err
-			}
-
-			r, err := gorillamux.NewRouter(schema)
-			if err != nil {
-				c.Logger().Errorf("error creating router: %v", err)
-				return err
-			}
-
-			route, pathParams, err := r.FindRoute(c.Request())
-			if err != nil {
-				c.Logger().Debugf("error finding route for %s: %v", c.Request().URL.String(), err)
+				c.Logger().Debugf(
+					"error finding route for %s %s: %v",
+					c.Request().Method, c.Request().URL.String(), err,
+				)
 
 				if err == routers.ErrPathNotFound {
 					return echo.NewHTTPError(http.StatusNotFound, "Path not found")
@@ -104,6 +118,11 @@ func OpenAPIWithConfig(config Config) echo.MiddlewareFunc {
 			case openapi3.MultiError:
 				issues := convertError(err)
 				names := make([]string, 0, len(issues))
+
+				if val, ok := issues["body"]; ok {
+					return JSONValidationError(c, http.StatusBadRequest, "Request error", val)
+				}
+
 				for k := range issues {
 					names = append(names, k)
 				}
@@ -117,7 +136,7 @@ func OpenAPIWithConfig(config Config) echo.MiddlewareFunc {
 				}
 				return JSONValidationError(c, http.StatusUnprocessableEntity, "Validation error", errors)
 			default:
-				return JSONValidationError(c, http.StatusUnprocessableEntity, "Validation error", []string{err.Error()})
+				return err
 			}
 
 			c.Set(config.ContextKey, requestValidationInput)
@@ -129,7 +148,6 @@ func OpenAPIWithConfig(config Config) echo.MiddlewareFunc {
 
 func convertError(me openapi3.MultiError) map[string][]string {
 	issues := make(map[string][]string)
-	const schema = "schema"
 	for _, err := range me {
 		switch err := err.(type) {
 		case *openapi3.SchemaError:
@@ -147,13 +165,17 @@ func convertError(me openapi3.MultiError) map[string][]string {
 
 			msg = strings.ReplaceAll(msg, "\"", "'")
 
-			issues[schema] = append(issues[schema], msg)
+			issues[field] = append(issues[field], msg)
 		case *openapi3filter.RequestError: // possible there were multiple issues that failed validation
 			// check if invalid HTTP parameter
 			if err.Parameter != nil {
 				prefix := err.Parameter.In
 				name := fmt.Sprintf("%s.%s", prefix, err.Parameter.Name)
-				issues[name] = append(issues[name], err.Error())
+				split := strings.Split(err.Err.Error(), "\n")
+
+				msg := fmt.Sprintf("parameter '%s' in %s has an error: %s", err.Parameter.Name, prefix, split[0])
+
+				issues[name] = append(issues[name], msg)
 				continue
 			}
 
@@ -166,6 +188,7 @@ func convertError(me openapi3.MultiError) map[string][]string {
 
 			// check if requestBody
 			if err.RequestBody != nil {
+				issues["body"] = append(issues["body"], err.Error())
 				continue
 			}
 		default:
