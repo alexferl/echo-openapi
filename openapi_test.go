@@ -121,13 +121,6 @@ func TestOpenAPIWithConfig_FindRoute(t *testing.T) {
 }
 
 func TestOpenAPIWithConfig_Request_Validation(t *testing.T) {
-	/*
-		"errors":["username: property 'username' is missing"]
-		"errors":["property 'invalid' is unsupported","username: Field must be set to string or not be present"]}
-		"errors":["parameter 'username' in path has an error: minimum string length is 2"]}
-		"errors":["parameter 'limit' in query has an error: number must be at most 100"]}
-		"errors":["parameter 'x-username' in header has an error: minimum string length is 2"]}
-	*/
 	testCases := []struct {
 		name        string
 		path        string
