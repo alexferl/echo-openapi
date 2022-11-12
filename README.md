@@ -119,46 +119,46 @@ You should also have the following in the server's log to help you debug your sc
 ### Configuration
 ```go
 type Config struct {
-	// Skipper defines a function to skip middleware.
-	Skipper middleware.Skipper
+    // Skipper defines a function to skip middleware.
+    Skipper middleware.Skipper
 
-	// Schema defines the OpenAPI that will be loaded and
-	// that the request and responses will be validated against.
-	// Required.
-	Schema string
+    // Schema defines the OpenAPI that will be loaded and
+    // that the request and responses will be validated against.
+    // Required.
+    Schema string
 
-	// ContextKey defines the key that will be used to store the validator
-	// on the echo.Context when the request is successfully validated.
-	// Optional. Defaults to "validator".
-	ContextKey string
+    // ContextKey defines the key that will be used to store the validator
+    // on the echo.Context when the request is successfully validated.
+    // Optional. Defaults to "validator".
+    ContextKey string
 
-	// ExemptRoutes defines routes and methods that don't require tokens.
-	// Optional.
-	ExemptRoutes map[string][]string
+    // ExemptRoutes defines routes and methods that don't require tokens.
+    // Optional.
+    ExemptRoutes map[string][]string
 }
 
 type HandlerConfig struct {
-	// ContentType sets the Content-Type header of the response.
-	// Optional. Defaults to "application/json".
-	ContentType string
+    // ContentType sets the Content-Type header of the response.
+    // Optional. Defaults to "application/json".
+    ContentType string
 
-	// ValidatorKey defines the key that will be used to read the
-	// *openapi3filter.RequestValidationInput from the echo.Context
-	// set by the middleware.
-	// Optional. Defaults to "validator".
-	ValidatorKey string
+    // ValidatorKey defines the key that will be used to read the
+    // *openapi3filter.RequestValidationInput from the echo.Context
+    // set by the middleware.
+    // Optional. Defaults to "validator".
+    ValidatorKey string
 
-	// ExcludeRequestBody makes Validate skips request body validation.
-	// Optional. Defaults to false.
-	ExcludeRequestBody bool
+    // ExcludeRequestBody makes Validate skips request body validation.
+    // Optional. Defaults to false.
+    ExcludeRequestBody bool
 
-	// ExcludeResponseBody makes Validate skips response body validation.
-	// Optional. Defaults to false.
-	ExcludeResponseBody bool
+    // ExcludeResponseBody makes Validate skips response body validation.
+    // Optional. Defaults to false.
+    ExcludeResponseBody bool
 
-	// IncludeResponseStatus makes Validate fail on response
-	// statuses not defined in the OpenAPI spec.
-	// Optional. Defaults to true.
-	IncludeResponseStatus bool
+    // IncludeResponseStatus makes Validate fail on response
+    // statuses not defined in the OpenAPI spec.
+    // Optional. Defaults to true.
+    IncludeResponseStatus bool
 }
 ```
