@@ -5,8 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"sort"
 	"strings"
 
+	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/getkin/kin-openapi/openapi3filter"
 	"github.com/labstack/echo/v4"
 )
@@ -130,8 +132,30 @@ func (h *Handler) validate(c echo.Context, code int, contentType string, v any) 
 	ctx := context.Background()
 	err = openapi3filter.ValidateResponse(ctx, responseValidationInput)
 	if err != nil {
-		c.Logger().Error(err)
-		return fmt.Errorf("failed validating response: %v", err)
+		switch err := err.(type) {
+		case nil:
+		case *openapi3filter.ResponseError:
+			if me, ok := err.Err.(openapi3.MultiError); ok {
+				issues := convertError(me)
+				names := make([]string, 0, len(issues))
+
+				for k := range issues {
+					names = append(names, k)
+				}
+				sort.Strings(names)
+				var errors []string
+				for _, k := range names {
+					msgs := issues[k]
+					for _, msg := range msgs {
+						errors = append(errors, msg)
+					}
+				}
+
+				return fmt.Errorf("failed validating response: %s", strings.Join(errors, "; "))
+			}
+		default:
+			return fmt.Errorf("failed validating response: %v", err)
+		}
 	}
 
 	return c.Blob(code, h.Config.ContentType, b)
