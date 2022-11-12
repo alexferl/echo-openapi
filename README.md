@@ -15,10 +15,11 @@ go get github.com/alexferl/echo-openapi
 package main
 
 import (
-	"net/http"
+    "net/http"
 
-	mw "github.com/alexferl/echo-openapi"
-	"github.com/labstack/echo/v4"
+    mw "github.com/alexferl/echo-openapi"
+    "github.com/labstack/echo/v4"
+    "github.com/labstack/echo/v4/middleware"
 )
 
 /*
@@ -58,23 +59,24 @@ paths:
 */
 
 type Handler struct {
-	*mw.Handler
+    *mw.Handler
 }
 
 func (h *Handler) Hello(c echo.Context) error {
-	msg := c.QueryParam("message")
-	return h.Validate(c, http.StatusOK, echo.Map{"message": msg})
+    msg := c.QueryParam("message")
+    return h.Validate(c, http.StatusOK, echo.Map{"message": msg})
 }
 
 func main() {
-	e := echo.New()
+    e := echo.New()
 
-	h := &Handler{mw.NewHandler()}
-	e.Add(http.MethodPost, "/hello", h.Hello)
+    h := &Handler{mw.NewHandler()}
+    e.Add(http.MethodPost, "/hello", h.Hello)
 
-	e.Use(mw.OpenAPI("./path/to/openapi.yaml"))
+    e.Use(middleware.Logger())
+    e.Use(mw.OpenAPI("./openapi.yaml"))
 
-	e.Logger.Fatal(e.Start("localhost:1323"))
+    e.Logger.Fatal(e.Start("localhost:1323"))
 }
 ```
 Send an invalid request to test request validation:
@@ -82,7 +84,7 @@ Send an invalid request to test request validation:
 curl -i -X POST http://localhost:1323/hello
 HTTP/1.1 422 Unprocessable Entity
 Content-Type: application/json; charset=UTF-8
-Date: Mon, 07 Nov 2022 01:13:40 GMT
+Date: Sat, 12 Nov 2022 17:31:24 GMT
 Content-Length: 117
 
 {"message":"Validation error","errors":["parameter 'message' in query has an error: value is required but missing"]}
@@ -93,7 +95,7 @@ Send a valid request:
 curl -i -X POST http://localhost:1323/hello\?message\=hello
 HTTP/1.1 200 OK
 Content-Type: application/json
-Date: Mon, 07 Nov 2022 01:22:59 GMT
+Date: Sat, 12 Nov 2022 17:31:47 GMT
 Content-Length: 19
 
 {"message":"hello"}
@@ -104,14 +106,14 @@ Send a valid request with an invalid response:
 curl -i -X POST http://localhost:1323/hello\?message\=a
 HTTP/1.1 500 Internal Server Error
 Content-Type: application/json
-Date: Mon, 07 Nov 2022 01:16:43 GMT
+Date: Sat, 12 Nov 2022 17:31:01 GMT
 Content-Length: 36
 
 {"message":"Internal Server Error"}
 ```
 You should also have the following in the server's log to help you debug your schema:
 ```shell
-{"time":"2022-11-06T20:16:43.914629-05:00","level":"ERROR","prefix":"echo","file":"handler.go","line":"133","message":"response body doesn't match the schema: Error at \"/message\": minimum string length is 4\nSchema:\n  {\n    \"description\": \"Welcome message\",\n    \"minLength\": 4,\n    \"type\": \"string\"\n  }\n\nValue:\n  \"hi\"\n"}
+{"error":"failed validating response: message: minimum string length is 4"}
 ```
 
 ### Configuration
