@@ -1,6 +1,6 @@
 module github.com/alexferl/echo-openapi
 
-go 1.19
+go 1.21
 
 require (
 	github.com/getkin/kin-openapi v0.123.0
