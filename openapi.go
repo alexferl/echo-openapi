@@ -2,6 +2,7 @@ package openapi
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"sort"
@@ -92,11 +93,11 @@ func OpenAPIWithConfig(config Config) echo.MiddlewareFunc {
 					c.Request().Method, c.Request().URL.String(), err,
 				)
 
-				if err == routers.ErrPathNotFound {
+				if errors.Is(err, routers.ErrPathNotFound) {
 					return echo.NewHTTPError(http.StatusNotFound, "Path not found")
 				}
 
-				if err == routers.ErrMethodNotAllowed {
+				if errors.Is(err, routers.ErrMethodNotAllowed) {
 					return echo.NewHTTPError(http.StatusMethodNotAllowed, "Method not allowed")
 				}
 
@@ -127,14 +128,14 @@ func OpenAPIWithConfig(config Config) echo.MiddlewareFunc {
 					names = append(names, k)
 				}
 				sort.Strings(names)
-				var errors []string
+				var errs []string
 				for _, k := range names {
 					msgs := issues[k]
 					for _, msg := range msgs {
-						errors = append(errors, msg)
+						errs = append(errs, msg)
 					}
 				}
-				return JSONValidationError(c, http.StatusUnprocessableEntity, "Validation error", errors)
+				return JSONValidationError(c, http.StatusUnprocessableEntity, "Validation error", errs)
 			default:
 				return err
 			}

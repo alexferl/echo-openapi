@@ -151,7 +151,7 @@ func TestOpenAPIWithConfig_Request_Validation(t *testing.T) {
 			statusCode: http.StatusUnprocessableEntity,
 			errors: []string{
 				"property 'invalid' is unsupported",
-				"username: Field must be set to string or not be present",
+				"username: value must be a string",
 			},
 		},
 		{
