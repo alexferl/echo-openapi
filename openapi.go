@@ -25,6 +25,15 @@ type Config struct {
 	// Required.
 	Schema string
 
+	// SchemaBytes allows loading the OpenAPI specification directly
+	// from a byte slice ([]byte). This is useful for embedding the
+	// OpenAPI spec in the binary using Go's embed package, or if the
+	// spec is obtained dynamically at runtime.
+	// Required unless Schema is provided.
+	//
+	// If both Schema and SchemaBytes are provided, SchemaBytes takes precedence.
+	SchemaBytes []byte
+
 	// ContextKey defines the key that will be used to store the validator
 	// on the echo.Context when the request is successfully validated.
 	// Optional. Defaults to "validator".
@@ -46,13 +55,19 @@ func OpenAPI(file string) echo.MiddlewareFunc {
 	return OpenAPIWithConfig(c)
 }
 
+func OpenAPIFromBytes(schemaBytes []byte) echo.MiddlewareFunc {
+	c := DefaultConfig
+	c.SchemaBytes = schemaBytes
+	return OpenAPIWithConfig(c)
+}
+
 func OpenAPIWithConfig(config Config) echo.MiddlewareFunc {
 	if config.Skipper == nil {
 		config.Skipper = DefaultConfig.Skipper
 	}
 
-	if config.Schema == "" {
-		panic("schema is required")
+	if config.Schema == "" && len(config.SchemaBytes) == 0 {
+		panic("either schema or schemaBytes is required")
 	}
 
 	if config.ContextKey == "" {
@@ -61,7 +76,16 @@ func OpenAPIWithConfig(config Config) echo.MiddlewareFunc {
 
 	ctx := context.Background()
 	loader := &openapi3.Loader{Context: ctx, IsExternalRefsAllowed: true}
-	schema, err := loader.LoadFromFile(config.Schema)
+
+	var schema *openapi3.T
+	var err error
+
+	if len(config.SchemaBytes) > 0 {
+		schema, err = loader.LoadFromData(config.SchemaBytes)
+	} else {
+		schema, err = loader.LoadFromFile(config.Schema)
+	}
+
 	if err != nil {
 		panic(fmt.Sprintf("failed loading schema file: %v", err))
 	}
