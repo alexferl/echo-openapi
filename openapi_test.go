@@ -217,3 +217,99 @@ func TestOpenAPIWithConfig_Request_Validation(t *testing.T) {
 		})
 	}
 }
+
+func TestOpenAPIFromBytes(t *testing.T) {
+	sampleOpenAPISpec := []byte(`
+openapi: 3.0.0
+info:
+  title: Sample API
+  version: "1.0"
+paths:
+  /:
+    get:
+      responses:
+        '200':
+          description: OK
+  /validation:
+    post:
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                username:
+                  type: string
+                  minLength: 2
+      responses:
+        '200':
+          description: OK
+`)
+
+	testCases := []struct {
+		name        string
+		method      string
+		path        string
+		body        *bytes.Buffer
+		statusCode  int
+		contentType string
+	}{
+		{
+			name:       "valid GET request to /",
+			method:     http.MethodGet,
+			path:       "/",
+			body:       nil, // No body for GET requests
+			statusCode: http.StatusOK,
+		},
+		{
+			name:        "invalid POST request to /validation with empty body",
+			method:      http.MethodPost,
+			path:        "/validation",
+			body:        bytes.NewBuffer([]byte(``)),
+			statusCode:  http.StatusBadRequest,
+			contentType: echo.MIMEApplicationJSON,
+		},
+		{
+			name:        "valid POST request to /validation",
+			method:      http.MethodPost,
+			path:        "/validation",
+			body:        bytes.NewBuffer([]byte(`{"username": "test"}`)),
+			statusCode:  http.StatusOK,
+			contentType: echo.MIMEApplicationJSON,
+		},
+	}
+
+	e := echo.New()
+
+	e.Any("/", func(c echo.Context) error {
+		return c.JSON(http.StatusOK, "ok")
+	})
+
+	e.Any("/validation", func(c echo.Context) error {
+		return c.JSON(http.StatusOK, "ok")
+	})
+
+	e.Use(OpenAPIFromBytes(sampleOpenAPISpec))
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			var req *http.Request
+
+			if tc.body == nil {
+				req = httptest.NewRequest(tc.method, tc.path, http.NoBody)
+			} else {
+				req = httptest.NewRequest(tc.method, tc.path, tc.body)
+			}
+
+			if tc.contentType != "" {
+				req.Header.Set("Content-Type", tc.contentType)
+			}
+
+			resp := httptest.NewRecorder()
+			e.ServeHTTP(resp, req)
+
+			assert.Equal(t, tc.statusCode, resp.Code)
+		})
+	}
+}
